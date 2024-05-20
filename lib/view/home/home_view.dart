@@ -3,21 +3,26 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rust_ndk_app/utils/persistence.dart';
 //import 'package:hive_flutter/adapters.dart';
 import 'package:lottie/lottie.dart';
 import 'package:flutter_slider_drawer/flutter_slider_drawer.dart';
 
 ///
-import 'package:flutter_rust_ndk_app/src/rust/api/simple.dart';
+import 'package:flutter_rust_ndk_app/src/rust/api/model.dart';
+import 'package:provider/provider.dart';
+//import 'package:flutter_rust_ndk_app/src/rust/api/model_persistence.dart';
+
 //import '../../main.dart';
 //import '../../models/task.dart';
 import '../../utils/colors.dart';
-import '../../utils/constanst.dart';
+import '../../utils/constants.dart';
 import '../../view/home/widgets/task_widget.dart';
 import '../../view/tasks/task_view.dart';
 import '../../utils/strings.dart';
 
 class HomeView extends StatefulWidget {
+  // ignore: use_super_parameters
   const HomeView({Key? key}) : super(key: key);
 
   @override
@@ -27,17 +32,6 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   GlobalKey<SliderDrawerState> dKey = GlobalKey<SliderDrawerState>();
-
-  /// Checking Done Tasks
-  int checkDoneTask(List<Task> task) {
-    int i = 0;
-    for (Task doneTasks in task) {
-      if (doneTasks.isCompleted) {
-        i++;
-      }
-    }
-    return i;
-  }
 
   /// Checking The Value Of the Circle Indicator
   dynamic valueOfTheIndicator(List<Task> task) {
@@ -50,16 +44,21 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    final base = BaseWidget.of(context);
+    //final base = BaseWidget.of(context);
+    final taskPersistence =
+        Provider.of<TaskPersistenceModel>(context, listen: false);
     var textTheme = Theme.of(context).textTheme;
 
     return ValueListenableBuilder(
-        valueListenable: base.dataStore.listenToTask(),
-        builder: (ctx, Box<Task> box, Widget? child) {
-          var tasks = box.values.toList();
+        //valueListenable: base.dataStore.listenToTask(),
+        valueListenable: taskPersistence.notifier(),
+        //builder: (ctx, Box<Task> box, Widget? child) {
+        builder: (ctx, Task value, Widget? child) {
+          //var tasks = box.values.toList();
+          var tasks = taskPersistence.readAllTasks();
 
           /// Sort Task List
-          tasks.sort(((a, b) => a.createdAtDate.compareTo(b.createdAtDate)));
+          tasks.sort(((a, b) => a.getCreatedAt().compareTo(b.getCreatedAt())));
 
           return Scaffold(
             backgroundColor: Colors.white,
@@ -84,7 +83,7 @@ class _HomeViewState extends State<HomeView> {
               /// Main Body
               child: _buildBody(
                 tasks,
-                base,
+                //TODO: verefy the chages //this,
                 textTheme,
               ),
             ),
@@ -95,15 +94,18 @@ class _HomeViewState extends State<HomeView> {
   /// Main Body
   SizedBox _buildBody(
     List<Task> tasks,
-    BaseWidget base,
+    //Widget base,
     TextTheme textTheme,
   ) {
+    final taskPersistence =
+        Provider.of<TaskPersistenceModel>(context, listen: false);
+
     return SizedBox(
       width: double.infinity,
       height: double.infinity,
       child: Column(
         children: [
-          /// Top Section Of Home page : Text, Progrss Indicator
+          /// Top Section Of Home page : Text, Progress Indicator
           Container(
             margin: const EdgeInsets.fromLTRB(55, 0, 0, 0),
             width: double.infinity,
@@ -119,7 +121,8 @@ class _HomeViewState extends State<HomeView> {
                     valueColor:
                         const AlwaysStoppedAnimation(MyColors.primaryColor),
                     backgroundColor: Colors.grey,
-                    value: checkDoneTask(tasks) / valueOfTheIndicator(tasks),
+                    value: taskPersistence.countDoneTask() /
+                        valueOfTheIndicator(tasks),
                   ),
                 ),
                 const SizedBox(
@@ -135,7 +138,8 @@ class _HomeViewState extends State<HomeView> {
                     const SizedBox(
                       height: 3,
                     ),
-                    Text("${checkDoneTask(tasks)} of ${tasks.length} task",
+                    Text(
+                        "${taskPersistence.countDoneTask()} of ${tasks.length} task", //tasks
                         style: textTheme.titleMedium),
                   ],
                 )
@@ -182,9 +186,10 @@ class _HomeViewState extends State<HomeView> {
                           ],
                         ),
                         onDismissed: (direction) {
-                          base.dataStore.dalateTask(task: task);
+                          taskPersistence.deleteTask(taskId: task.getId());
+                          //base.dataStore.deleteTask(task: task);
                         },
-                        key: Key(task.id),
+                        key: Key(task.getId() as String),
                         child: TaskWidget(
                           task: tasks[index],
                         ),
@@ -224,6 +229,7 @@ class _HomeViewState extends State<HomeView> {
 
 /// My Drawer Slider
 class MySlider extends StatelessWidget {
+  // ignore: use_super_parameters
   MySlider({
     Key? key,
   }) : super(key: key);
@@ -264,8 +270,8 @@ class MySlider extends StatelessWidget {
           const SizedBox(
             height: 8,
           ),
-          Text("AmirHossein Bayat", style: textTheme.displayMedium),
-          Text("junior flutter dev", style: textTheme.displaySmall),
+          Text("Andrey Yelabugin", style: textTheme.displayMedium),
+          Text("senior dev", style: textTheme.displaySmall),
           Container(
             margin: const EdgeInsets.symmetric(
               vertical: 30,
@@ -306,6 +312,7 @@ class MySlider extends StatelessWidget {
 
 /// My App Bar
 class MyAppBar extends StatefulWidget implements PreferredSizeWidget {
+  // ignore: use_super_parameters
   MyAppBar({
     Key? key,
     required this.drawerKey,
@@ -340,7 +347,7 @@ class _MyAppBarState extends State<MyAppBar>
     super.dispose();
   }
 
-  /// toggle for drawer and icon aniamtion
+  /// toggle for drawer and icon animation
   void toggle() {
     setState(() {
       isDrawerOpen = !isDrawerOpen;
@@ -356,7 +363,10 @@ class _MyAppBarState extends State<MyAppBar>
 
   @override
   Widget build(BuildContext context) {
-    var base = BaseWidget.of(context).dataStore.box;
+    //var base = BaseWidget.of(context).dataStore.box;
+    final taskPersistence =
+        Provider.of<TaskPersistenceModel>(context, listen: false);
+
     return SizedBox(
       width: double.infinity,
       height: 132,
@@ -385,7 +395,8 @@ class _MyAppBarState extends State<MyAppBar>
               padding: const EdgeInsets.only(right: 20),
               child: GestureDetector(
                 onTap: () {
-                  base.isEmpty
+                  //base.isEmpty
+                  taskPersistence.countDoneTask() == 0
                       ? warningNoTask(context)
                       : deleteAllTask(context);
                 },
@@ -404,6 +415,7 @@ class _MyAppBarState extends State<MyAppBar>
 
 /// Floating Action Button
 class FAB extends StatelessWidget {
+  // ignore: use_super_parameters
   const FAB({Key? key}) : super(key: key);
 
   @override

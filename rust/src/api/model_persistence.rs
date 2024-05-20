@@ -2,7 +2,7 @@ use crate::api::model::Priority;
 use crate::api::model::Task;
 use chrono::{DateTime, Local};
 use lazy_static::lazy_static;
-use rusqlite::{params, Connection, Error as RusqliteError};
+use rusqlite::{params, Connection};
 use std::sync::Mutex;
 use uuid::Uuid;
 
@@ -19,7 +19,7 @@ struct CachedConnection {
 }
 
 impl CachedConnection {
-    fn new(db_path: &str) -> Result<Self, RusqliteError> {
+    fn new(db_path: &str) -> Result<Self, rusqlite::Error> {
         let db_path = db_path.to_owned(); // Clone the String
         let conn = Connection::open(&db_path)?;
         conn.execute(
@@ -37,7 +37,7 @@ impl CachedConnection {
         }) //db_path,
     }
 
-    //fn get_connection(&mut self) -> Result<&mut Connection, RusqliteError> { //TODO: need to figure out the issue returning connection through function
+    //fn get_connection(&mut self) -> Result<&mut Connection, rusqlite::Error> { //TODO: need to figure out the issue returning connection through function
     //     let conn = self.conn.get_mut().unwrap();
 
     //     if conn.is_none() {
@@ -57,7 +57,7 @@ impl CachedConnection {
     //     }
 
     //     conn.as_mut()
-    //         .ok_or(RusqliteError::InvalidPath(PathBuf::from(&self.db_path)))
+    //         .ok_or(rusqlite::Error::InvalidPath(PathBuf::from(&self.db_path)))
     //}
 }
 
@@ -67,7 +67,7 @@ enum CustomError {
     InvalidConnection(String),
 }
 
-impl From<CustomError> for RusqliteError {
+impl From<CustomError> for rusqlite::Error {
     fn from(err: CustomError) -> Self {
         match err {
             CustomError::ParsingError(msg) => {
@@ -87,11 +87,11 @@ pub fn create_task_in_db(
     title: &str,
     subtitle: &str,
     priority: Priority,
-) -> Result<(), RusqliteError> {
+) -> Result<(), rusqlite::Error> {
     let mut conn_lock = CONNECTION.conn.lock().unwrap();
     let conn = conn_lock
         .as_mut()
-        .ok_or(RusqliteError::from(CustomError::InvalidConnection(
+        .ok_or(rusqlite::Error::from(CustomError::InvalidConnection(
             "Invalid connection".to_string(),
         )))?;
     let task = Task::new(title, subtitle, priority);
@@ -99,21 +99,21 @@ pub fn create_task_in_db(
     Ok(())
 }
 // Read all tasks from the database
-pub fn read_all_tasks_from_db() -> Result<Vec<Task>, RusqliteError> {
+pub fn read_all_tasks_from_db() -> Result<Vec<Task>, rusqlite::Error> {
     let mut conn_lock = CONNECTION.conn.lock().unwrap();
     let conn = conn_lock
         .as_mut()
-        .ok_or(RusqliteError::from(CustomError::InvalidConnection(
+        .ok_or(rusqlite::Error::from(CustomError::InvalidConnection(
             "Invalid connection".to_string(),
         )))?;
     read_tasks(conn)
 }
 // Read task from the database
-pub fn read_task_from_db(task_id: &Uuid) -> Result<Option<Task>, RusqliteError> {
+pub fn read_task_from_db(task_id: &Uuid) -> Result<Option<Task>, rusqlite::Error> {
     let mut conn_lock = CONNECTION.conn.lock().unwrap();
     let conn = conn_lock
         .as_mut()
-        .ok_or(RusqliteError::from(CustomError::InvalidConnection(
+        .ok_or(rusqlite::Error::from(CustomError::InvalidConnection(
             "Invalid connection".to_string(),
         )))?;
     //let mut conn = CONNECTION.get_connection()?; //TODO: figure out why does not work
@@ -126,11 +126,11 @@ pub fn update_task_in_db(
     subtitle: &str,
     priority: Priority,
     is_completed: bool,
-) -> Result<(), RusqliteError> {
+) -> Result<(), rusqlite::Error> {
     let mut conn_lock = CONNECTION.conn.lock().unwrap();
     let conn = conn_lock
         .as_mut()
-        .ok_or(RusqliteError::from(CustomError::InvalidConnection(
+        .ok_or(rusqlite::Error::from(CustomError::InvalidConnection(
             "Invalid connection".to_string(),
         )))?;
     let task = Task {
@@ -145,17 +145,17 @@ pub fn update_task_in_db(
     Ok(())
 }
 // Delete a task from the database
-pub fn delete_task_from_db(task_id: &Uuid) -> Result<(), RusqliteError> {
+pub fn delete_task_from_db(task_id: &Uuid) -> Result<(), rusqlite::Error> {
     let mut conn_lock = CONNECTION.conn.lock().unwrap();
     let conn = conn_lock
         .as_mut()
-        .ok_or(RusqliteError::from(CustomError::InvalidConnection(
+        .ok_or(rusqlite::Error::from(CustomError::InvalidConnection(
             "Invalid connection".to_string(),
         )))?;
     delete_task(conn, task_id)
 }
 
-fn create_task(conn: &Connection, task: &Task) -> Result<(), RusqliteError> {
+fn create_task(conn: &Connection, task: &Task) -> Result<(), rusqlite::Error> {
     conn.execute(
         "INSERT INTO tasks (
         id,
@@ -177,7 +177,7 @@ fn create_task(conn: &Connection, task: &Task) -> Result<(), RusqliteError> {
     Ok(())
 }
 
-fn read_tasks(conn: &Connection) -> Result<Vec<Task>, RusqliteError> {
+fn read_tasks(conn: &Connection) -> Result<Vec<Task>, rusqlite::Error> {
     let mut stmt =
         conn.prepare("SELECT id, title, subtitle, created_at, is_completed, priority FROM tasks")?;
     let task_iter = stmt.query_map([], |row| {
@@ -186,7 +186,7 @@ fn read_tasks(conn: &Connection) -> Result<Vec<Task>, RusqliteError> {
             Ok(id) => id,
             Err(err) => {
                 // Handle the uuid::Error appropriately (e.g., return Err)
-                return Err(RusqliteError::from(CustomError::ParsingError(format!(
+                return Err(rusqlite::Error::from(CustomError::ParsingError(format!(
                     "Error parsing UUID: {}",
                     err
                 ))));
@@ -199,7 +199,7 @@ fn read_tasks(conn: &Connection) -> Result<Vec<Task>, RusqliteError> {
             Ok(dt) => dt.with_timezone(&Local),
             Err(err) => {
                 // Handle the chrono::ParseError appropriately (e.g., return Err)
-                return Err(RusqliteError::from(CustomError::ParsingError(format!(
+                return Err(rusqlite::Error::from(CustomError::ParsingError(format!(
                     "Error parsing data: {}",
                     err
                 ))));
@@ -229,7 +229,7 @@ fn read_tasks(conn: &Connection) -> Result<Vec<Task>, RusqliteError> {
     Ok(tasks)
 }
 
-fn read_task(conn: &Connection, task_id: &Uuid) -> Result<Option<Task>, RusqliteError> {
+fn read_task(conn: &Connection, task_id: &Uuid) -> Result<Option<Task>, rusqlite::Error> {
     let mut stmt = conn.prepare(
         "SELECT id, title, subtitle, created_at, is_completed, priority FROM tasks WHERE id = ?",
     )?;
@@ -242,7 +242,7 @@ fn read_task(conn: &Connection, task_id: &Uuid) -> Result<Option<Task>, Rusqlite
             Ok(id) => id,
             Err(err) => {
                 // Handle the uuid::Error appropriately (e.g., return Err)
-                return Err(RusqliteError::from(CustomError::ParsingError(format!(
+                return Err(rusqlite::Error::from(CustomError::ParsingError(format!(
                     "Error parsing UUID: {}",
                     err
                 ))));
@@ -256,7 +256,7 @@ fn read_task(conn: &Connection, task_id: &Uuid) -> Result<Option<Task>, Rusqlite
             Ok(dt) => dt.with_timezone(&Local),
             Err(err) => {
                 // Handle the chrono::ParseError appropriately (e.g., return Err)
-                return Err(RusqliteError::from(CustomError::ParsingError(format!(
+                return Err(rusqlite::Error::from(CustomError::ParsingError(format!(
                     "Error parsing data: {}",
                     err
                 ))));
@@ -282,7 +282,7 @@ fn read_task(conn: &Connection, task_id: &Uuid) -> Result<Option<Task>, Rusqlite
     Ok(task)
 }
 
-fn update_task(conn: &Connection, task: &Task) -> Result<(), RusqliteError> {
+fn update_task(conn: &Connection, task: &Task) -> Result<(), rusqlite::Error> {
     conn.execute(
         "UPDATE tasks SET
           title = ?,
@@ -303,7 +303,7 @@ fn update_task(conn: &Connection, task: &Task) -> Result<(), RusqliteError> {
     Ok(())
 }
 
-fn delete_task(conn: &Connection, task_id: &Uuid) -> Result<(), RusqliteError> {
+fn delete_task(conn: &Connection, task_id: &Uuid) -> Result<(), rusqlite::Error> {
     conn.execute("DELETE FROM tasks WHERE id = ?", [task_id.to_string()])?;
     Ok(())
 }
