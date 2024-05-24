@@ -1,25 +1,19 @@
-// ignore_for_file: must_be_immutable
-
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_rust_ndk_app/utils/persistence.dart';
-//import 'package:hive_flutter/adapters.dart';
+import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
 import 'package:flutter_slider_drawer/flutter_slider_drawer.dart';
 
 ///
+import 'package:flutter_rust_ndk_app/utils/persistence.dart';
 import 'package:flutter_rust_ndk_app/src/rust/api/model.dart';
-import 'package:provider/provider.dart';
-//import 'package:flutter_rust_ndk_app/src/rust/api/model_persistence.dart';
-
-//import '../../main.dart';
-//import '../../models/task.dart';
-import '../../utils/colors.dart';
-import '../../utils/constants.dart';
-import '../../view/home/widgets/task_widget.dart';
-import '../../view/tasks/task_view.dart';
-import '../../utils/strings.dart';
+import 'package:flutter_rust_ndk_app/utils/colors.dart';
+import 'package:flutter_rust_ndk_app/utils/constants.dart';
+import 'package:flutter_rust_ndk_app/view/home/widgets/task_widget.dart';
+import 'package:flutter_rust_ndk_app/view/tasks/task_view.dart';
+import 'package:flutter_rust_ndk_app/utils/strings.dart';
 
 class HomeView extends StatefulWidget {
   // ignore: use_super_parameters
@@ -34,67 +28,50 @@ class _HomeViewState extends State<HomeView> {
   GlobalKey<SliderDrawerState> dKey = GlobalKey<SliderDrawerState>();
 
   /// Checking The Value Of the Circle Indicator
-  dynamic valueOfTheIndicator(List<Task> task) {
-    if (task.isNotEmpty) {
-      return task.length;
-    } else {
-      return 3;
-    }
-  }
+  // dynamic calculateValueOfProgressIndicator(List<Task> task) {
+  //   if (task.isNotEmpty) {
+  //     return task.length;
+  //   } else {
+  //     return 1;
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
-    //final base = BaseWidget.of(context);
     final taskPersistence =
         Provider.of<TaskPersistenceModel>(context, listen: false);
-    var textTheme = Theme.of(context).textTheme;
+    final textTheme = Theme.of(context).textTheme;
 
-    return ValueListenableBuilder(
-        //valueListenable: base.dataStore.listenToTask(),
-        valueListenable: taskPersistence.notifier(),
-        //builder: (ctx, Box<Task> box, Widget? child) {
-        builder: (ctx, Task value, Widget? child) {
-          //var tasks = box.values.toList();
-          var tasks = taskPersistence.readAllTasks();
-
-          /// Sort Task List
-          tasks.sort(((a, b) => a.getCreatedAt().compareTo(b.getCreatedAt())));
-
-          return Scaffold(
-            backgroundColor: Colors.white,
-
-            /// Floating Action Button
-            floatingActionButton: const FAB(),
-
-            /// Body
-            body: SliderDrawer(
-              isDraggable: false,
-              key: dKey,
-              animationDuration: 1000,
-
-              /// My AppBar
-              appBar: MyAppBar(
-                drawerKey: dKey,
-              ),
-
-              /// My Drawer Slider
-              slider: MySlider(),
-
-              /// Main Body
-              child: _buildBody(
-                tasks,
-                //TODO: verefy the chages //this,
-                textTheme,
-              ),
+    return ValueListenableBuilder<Task>(
+      valueListenable: taskPersistence.notifier(),
+      builder: (context, tasks, _) {
+        // No need to call readAllTasks or sort within the builder
+        var tasks = taskPersistence.readAllTasks(
+          createdAt: DateTime.now(),
+          isCompletedOnly: false,
+          isIgnoreCreatedAt: true,
+        );
+        return Scaffold(
+          backgroundColor: Colors.white,
+          floatingActionButton: const FloatingActionButton(),
+          body: SliderDrawer(
+            isDraggable: false,
+            key: dKey,
+            animationDuration: 1000,
+            appBar: HomeViewAppBar(
+              drawerKey: dKey,
             ),
-          );
-        });
+            slider: const HomeViewSlider(),
+            child: _buildBody(tasks, textTheme),
+          ),
+        );
+      },
+    );
   }
 
   /// Main Body
-  SizedBox _buildBody(
+  Widget _buildBody(
     List<Task> tasks,
-    //Widget base,
     TextTheme textTheme,
   ) {
     final taskPersistence =
@@ -105,49 +82,10 @@ class _HomeViewState extends State<HomeView> {
       height: double.infinity,
       child: Column(
         children: [
-          /// Top Section Of Home page : Text, Progress Indicator
-          Container(
-            margin: const EdgeInsets.fromLTRB(55, 0, 0, 0),
-            width: double.infinity,
-            height: 100,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                /// CircularProgressIndicator
-                SizedBox(
-                  width: 25,
-                  height: 25,
-                  child: CircularProgressIndicator(
-                    valueColor:
-                        const AlwaysStoppedAnimation(MyColors.primaryColor),
-                    backgroundColor: Colors.grey,
-                    value: taskPersistence.countDoneTask() /
-                        valueOfTheIndicator(tasks),
-                  ),
-                ),
-                const SizedBox(
-                  width: 25,
-                ),
+          // Top Section
+          _buildTopSection(tasks, textTheme, taskPersistence),
 
-                /// Texts
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(MyString.mainTitle, style: textTheme.displayLarge),
-                    const SizedBox(
-                      height: 3,
-                    ),
-                    Text(
-                        "${taskPersistence.countDoneTask()} of ${tasks.length} task", //tasks
-                        style: textTheme.titleMedium),
-                  ],
-                )
-              ],
-            ),
-          ),
-
-          /// Divider
+          // Divider
           const Padding(
             padding: EdgeInsets.only(top: 10),
             child: Divider(
@@ -156,86 +94,136 @@ class _HomeViewState extends State<HomeView> {
             ),
           ),
 
-          /// Bottom ListView : Tasks
-          SizedBox(
-            width: double.infinity,
-            height: 585,
-            child: tasks.isNotEmpty
-                ? ListView.builder(
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: tasks.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      var task = tasks[index];
-
-                      return Dismissible(
-                        direction: DismissDirection.horizontal,
-                        background: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.delete_outline,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(
-                              width: 8,
-                            ),
-                            Text(MyString.deletedTask,
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                ))
-                          ],
-                        ),
-                        onDismissed: (direction) {
-                          taskPersistence.deleteTask(taskId: task.getId());
-                          //base.dataStore.deleteTask(task: task);
-                        },
-                        key: Key(task.getId() as String),
-                        child: TaskWidget(
-                          task: tasks[index],
-                        ),
-                      );
-                    },
-                  )
-
-                /// if All Tasks Done Show this Widgets
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      /// Lottie
-                      FadeIn(
-                        child: SizedBox(
-                          width: 200,
-                          height: 200,
-                          child: Lottie.asset(
-                            lottieURL,
-                            animate: tasks.isNotEmpty ? false : true,
-                          ),
-                        ),
-                      ),
-
-                      /// Bottom Texts
-                      FadeInUp(
-                        from: 30,
-                        child: const Text(MyString.doneAllTask),
-                      ),
-                    ],
-                  ),
-          )
+          // Bottom List or Done Message
+          _buildTaskListOrDoneMessage(tasks, taskPersistence),
         ],
       ),
+    );
+  }
+
+// Separated Widget for Top Section
+  Widget _buildTopSection(List<Task> tasks, TextTheme textTheme,
+      TaskPersistenceModel taskPersistence) {
+    final valueOfProgressForDivision = tasks.isNotEmpty ? tasks.length : 1;
+    final valueOfProgress = tasks.length;
+
+    return Flexible(
+        flex: 1,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(55, 0, 0, 0),
+          width: double.infinity,
+          height: 77,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              /// CircularProgressIndicator
+              SizedBox(
+                width: 25,
+                height: 25,
+                child: CircularProgressIndicator(
+                  valueColor: const AlwaysStoppedAnimation(
+                      TodoManagerColorConstants.primaryColor),
+                  backgroundColor: Colors.grey,
+                  value: taskPersistence.countDoneTask() /
+                      valueOfProgressForDivision,
+                ),
+              ),
+              const SizedBox(width: 25),
+              Expanded(
+                  child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(TodoManagerStringConstants.mainTitle,
+                      style: textTheme.displayLarge),
+                  const SizedBox(height: 3),
+                  Text(
+                      "${taskPersistence.countDoneTask()} of $valueOfProgress ${TodoManagerStringConstants.taskStrings}",
+                      style: textTheme.titleMedium),
+                ],
+              )),
+            ],
+          ),
+        ));
+  }
+
+// Separated Widget for Task List or Done Message
+  Widget _buildTaskListOrDoneMessage(
+      List<Task> tasks, TaskPersistenceModel taskPersistence) {
+    return Flexible(
+      flex: 5,
+      child: tasks.isNotEmpty
+          ? ListView.builder(
+              physics: const BouncingScrollPhysics(),
+              itemCount: tasks.length,
+              itemBuilder: (BuildContext context, int index) {
+                final task = tasks[index];
+                return Dismissible(
+                  direction: DismissDirection.horizontal,
+                  background: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.delete_outline,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(
+                        width: 8,
+                      ),
+                      Text(TodoManagerStringConstants.deletedTask,
+                          style: TextStyle(
+                            color: Colors.grey,
+                          ))
+                    ],
+                  ),
+                  onDismissed: (direction) {
+                    taskPersistence.deleteTask(taskId: task.getId());
+                  },
+                  key: Key(task.getId().toString()),
+                  child: TaskWidget(
+                    task: tasks[index],
+                  ),
+                );
+              },
+            )
+
+          /// if All Tasks Done Show this Widgets
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                /// Lottie
+                FadeIn(
+                  child: SizedBox(
+                    width: 200,
+                    height: 200,
+                    child: Lottie.asset(
+                      lottieURL,
+                      animate:
+                          tasks.isEmpty, // Animate only when tasks are empty
+                    ),
+                  ),
+                ),
+
+                /// Bottom Texts
+                FadeInUp(
+                  from: 30,
+                  child: const Text(TodoManagerStringConstants.doneAllTask),
+                ),
+              ],
+            ),
     );
   }
 }
 
 /// My Drawer Slider
-class MySlider extends StatelessWidget {
+class HomeViewSlider extends StatelessWidget {
   // ignore: use_super_parameters
-  MySlider({
+  const HomeViewSlider({
     Key? key,
   }) : super(key: key);
 
   /// Icons
-  List<IconData> icons = [
+  final List<IconData> icons = const [
     CupertinoIcons.home,
     CupertinoIcons.person_fill,
     CupertinoIcons.settings,
@@ -243,7 +231,7 @@ class MySlider extends StatelessWidget {
   ];
 
   /// Texts
-  List<String> texts = [
+  final List<String> texts = const [
     "Home",
     "Profile",
     "Settings",
@@ -252,12 +240,13 @@ class MySlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var textTheme = Theme.of(context).textTheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 90),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-            colors: MyColors.primaryGradientColor,
+            colors: TodoManagerColorConstants.primaryGradientColor,
             begin: Alignment.topLeft,
             end: Alignment.bottomRight),
       ),
@@ -267,41 +256,39 @@ class MySlider extends StatelessWidget {
             radius: 50,
             backgroundImage: AssetImage('assets/img/main.png'),
           ),
-          const SizedBox(
-            height: 8,
-          ),
-          Text("Andrey Yelabugin", style: textTheme.displayMedium),
-          Text("senior dev", style: textTheme.displaySmall),
+          const SizedBox(height: 8),
+          Text("Andrey Y's TECH", style: textTheme.displayMedium),
+          Text("consulting services", style: textTheme.displaySmall),
           Container(
-            margin: const EdgeInsets.symmetric(
-              vertical: 30,
-              horizontal: 10,
-            ),
+            margin: const EdgeInsets.symmetric(vertical: 30, horizontal: 10),
             width: double.infinity,
             height: 300,
-            child: ListView.builder(
+            child: ListView.separated(
                 itemCount: icons.length,
                 physics: const NeverScrollableScrollPhysics(),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 8.0),
                 itemBuilder: (ctx, i) {
-                  return InkWell(
-                    // ignore: avoid_print
-                    onTap: () => print("$i Selected"),
-                    child: Container(
-                      margin: const EdgeInsets.all(5),
-                      child: ListTile(
-                          leading: Icon(
-                            icons[i],
-                            color: Colors.white,
-                            size: 30,
-                          ),
-                          title: Text(
-                            texts[i],
-                            style: const TextStyle(
+                  return TextButton(
+                      onPressed: () {
+                        // Handle button press (consider navigation or functionality)
+                        if (kDebugMode) {
+                          print("$i Selected");
+                        }
+                        FocusManager.instance.primaryFocus?.unfocus();
+                      },
+                      child: Container(
+                          margin: const EdgeInsets.all(5),
+                          child: Row(children: [
+                            Icon(
+                              icons[i],
                               color: Colors.white,
+                              size: 30,
                             ),
-                          )),
-                    ),
-                  );
+                            const SizedBox(width: 10),
+                            Text(texts[i],
+                                style: const TextStyle(color: Colors.white)),
+                          ])));
                 }),
           )
         ],
@@ -311,22 +298,22 @@ class MySlider extends StatelessWidget {
 }
 
 /// My App Bar
-class MyAppBar extends StatefulWidget implements PreferredSizeWidget {
+class HomeViewAppBar extends StatefulWidget implements PreferredSizeWidget {
   // ignore: use_super_parameters
-  MyAppBar({
+  const HomeViewAppBar({
     Key? key,
     required this.drawerKey,
   }) : super(key: key);
-  GlobalKey<SliderDrawerState> drawerKey;
+  final GlobalKey<SliderDrawerState> drawerKey;
 
   @override
-  State<MyAppBar> createState() => _MyAppBarState();
+  State<HomeViewAppBar> createState() => _HomeViewAppBarState();
 
   @override
   Size get preferredSize => const Size.fromHeight(100);
 }
 
-class _MyAppBarState extends State<MyAppBar>
+class _HomeViewAppBarState extends State<HomeViewAppBar>
     with SingleTickerProviderStateMixin {
   late AnimationController controller;
   bool isDrawerOpen = false;
@@ -363,46 +350,53 @@ class _MyAppBarState extends State<MyAppBar>
 
   @override
   Widget build(BuildContext context) {
-    //var base = BaseWidget.of(context).dataStore.box;
     final taskPersistence =
         Provider.of<TaskPersistenceModel>(context, listen: false);
 
     return SizedBox(
-      width: double.infinity,
       height: 132,
       child: Padding(
-        padding: const EdgeInsets.only(top: 20),
+        padding: const EdgeInsets.only(top: 20.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            /// Animated Icon - Menu & Close
+            // Animated Menu/Close Icon
             Padding(
-              padding: const EdgeInsets.only(left: 20),
+              padding: const EdgeInsets.only(left: 20.0),
               child: IconButton(
                   splashColor: Colors.transparent,
                   highlightColor: Colors.transparent,
                   icon: AnimatedIcon(
                     icon: AnimatedIcons.menu_close,
                     progress: controller,
-                    size: 40,
+                    size: 40.0,
                   ),
                   onPressed: toggle),
             ),
-
-            /// Delete Icon
+            // Delete All Icon with confirmation handling
             Padding(
-              padding: const EdgeInsets.only(right: 20),
-              child: GestureDetector(
-                onTap: () {
-                  //base.isEmpty
-                  taskPersistence.countDoneTask() == 0
-                      ? warningNoTask(context)
-                      : deleteAllTask(context);
+              padding: const EdgeInsets.only(right: 20.0),
+              child: IconButton(
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                onPressed: () {
+                  final hasTasks = taskPersistence
+                      .readAllTasks(
+                          createdAt: DateTime.now(),
+                          isCompletedOnly: false,
+                          isIgnoreCreatedAt: false)
+                      .isNotEmpty;
+                  if (hasTasks) {
+                    deleteAllTask(context);
+                  } else {
+                    warningNoTask(context);
+                  }
+                  FocusManager.instance.primaryFocus?.unfocus();
                 },
-                child: const Icon(
+                icon: const Icon(
                   CupertinoIcons.trash,
-                  size: 40,
+                  size: 40.0,
                 ),
               ),
             ),
@@ -414,39 +408,39 @@ class _MyAppBarState extends State<MyAppBar>
 }
 
 /// Floating Action Button
-class FAB extends StatelessWidget {
+class FloatingActionButton extends StatelessWidget {
   // ignore: use_super_parameters
-  const FAB({Key? key}) : super(key: key);
+  const FloatingActionButton({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          CupertinoPageRoute(
-            builder: (context) => TaskView(
-              taskControllerForSubtitle: null,
-              taskControllerForTitle: null,
-              task: null,
+    return Padding(
+      padding: const EdgeInsets.only(right: 20),
+      child: ElevatedButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            CupertinoPageRoute(
+              builder: (context) => const TaskView(
+                taskControllerForSubtitle: null,
+                taskControllerForTitle: null,
+                task: null,
+              ),
             ),
+          );
+          FocusManager.instance.primaryFocus?.unfocus();
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: TodoManagerColorConstants.primaryColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15.0),
           ),
-        );
-      },
-      child: Material(
-        borderRadius: BorderRadius.circular(15),
-        elevation: 10,
-        child: Container(
-          width: 70,
-          height: 70,
-          decoration: BoxDecoration(
-            color: MyColors.primaryColor,
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: const Center(
-              child: Icon(
-            Icons.add,
-            color: Colors.white,
-          )),
+          padding: EdgeInsets.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: const Icon(
+          Icons.add,
+          color: Colors.white,
+          size: 40,
         ),
       ),
     );

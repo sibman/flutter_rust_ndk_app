@@ -57,3 +57,6 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+#/lib/src/rust/*
+#/rust/src/frb_generated*
+#frb_generated.h

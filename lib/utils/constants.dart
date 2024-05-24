@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:ftoast/ftoast.dart';
 import 'package:panara_dialogs/panara_dialogs.dart';
+import 'package:provider/provider.dart';
 
-///
-import '../utils/strings.dart';
-//import '../../main.dart';
+/// custom imports
+import 'package:flutter_rust_ndk_app/utils/persistence.dart';
+import 'package:flutter_rust_ndk_app/utils/strings.dart';
 
 /// Empty Title & Subtitle TextFields Warning
 emptyFieldsWarning(context) {
   return FToast.toast(
     context,
-    msg: MyString.oopsMsg,
+    msg: TodoManagerStringConstants.oopsMsg,
     subMsg: "You must fill all Fields!",
     corner: 20.0,
     duration: 2000,
@@ -22,7 +23,7 @@ emptyFieldsWarning(context) {
 nothingEnterOnUpdateTaskMode(context) {
   return FToast.toast(
     context,
-    msg: MyString.oopsMsg,
+    msg: TodoManagerStringConstants.oopsMsg,
     subMsg: "You must edit the tasks then try to update it!",
     corner: 20.0,
     duration: 3000,
@@ -34,7 +35,7 @@ nothingEnterOnUpdateTaskMode(context) {
 dynamic warningNoTask(BuildContext context) {
   return PanaraInfoDialog.showAnimatedGrow(
     context,
-    title: MyString.oopsMsg,
+    title: TodoManagerStringConstants.oopsMsg,
     message:
         "There is no Task For Delete!\n Try adding some and then try to delete it!",
     buttonText: "Okay",
@@ -47,9 +48,12 @@ dynamic warningNoTask(BuildContext context) {
 
 /// Delete All Task Dialog
 dynamic deleteAllTask(BuildContext context) {
+  final taskPersistence =
+      Provider.of<TaskPersistenceModel>(context, listen: false);
+
   return PanaraConfirmDialog.show(
     context,
-    title: MyString.areYouSure,
+    title: TodoManagerStringConstants.areYouSure,
     message:
         "Do You really want to delete all tasks? You will no be able to undo this action!",
     confirmButtonText: "Yes",
@@ -58,8 +62,8 @@ dynamic deleteAllTask(BuildContext context) {
       Navigator.pop(context);
     },
     onTapConfirm: () {
-      //TODO need to implement this
-      //BaseWidget.of(context).dataStore.box.clear();
+      //TODO verify implementation, do we need to delete historical data?
+      taskPersistence.deleteTasks();
       Navigator.pop(context);
     },
     panaraDialogType: PanaraDialogType.error,

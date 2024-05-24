@@ -1,5 +1,6 @@
 use chrono::{DateTime, Local};
 use flutter_rust_bridge::frb;
+use std::fmt;
 use uuid::Uuid;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -7,22 +8,51 @@ use uuid::Uuid;
 //#[frb(non_opaque)]
 pub enum Priority {
     Low,
-    Medium,
+    Normal,
     High,
 }
 
 impl Priority {
     #[flutter_rust_bridge::frb(sync)]
-    pub fn Low() -> Priority {
+    pub fn low_priority() -> Priority {
         Priority::Low
     }
     #[flutter_rust_bridge::frb(sync)]
-    pub fn Medium() -> Priority {
-        Priority::Medium
+    pub fn normal_priority() -> Priority {
+        Priority::Normal
     }
     #[flutter_rust_bridge::frb(sync)]
-    pub fn High() -> Priority {
+    pub fn high_priority() -> Priority {
         Priority::High
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn from_string(value: String) -> Priority {
+        match value.as_str() {
+            "Low" => Priority::Low,
+            "Normal" => Priority::Normal,
+            "High" => Priority::High,
+            _ => panic!("Invalid priority value in database"),
+        }
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn to_string(&self) -> String {
+        match self {
+            Priority::Low => String::from("Low"),
+            Priority::Normal => String::from("Normal"),
+            Priority::High => String::from("High"),
+        }
+    }
+}
+
+impl fmt::Display for Priority {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Priority::High => write!(f, "High"),
+            Priority::Normal => write!(f, "Normal"),
+            Priority::Low => write!(f, "Low"),
+        }
     }
 }
 
@@ -30,12 +60,12 @@ impl Priority {
 #[frb(opaque)]
 //#[frb(non_opaque)]
 pub struct Task {
-    id: Uuid,
-    title: String,
-    subtitle: String,
-    created_at: DateTime<Local>,
-    is_completed: bool,
-    priority: Priority,
+    pub(crate) id: Uuid,
+    pub(crate) title: String,
+    pub(crate) subtitle: String,
+    pub(crate) created_at: DateTime<Local>,
+    pub(crate) is_completed: bool,
+    pub(crate) priority: Priority,
 }
 
 // Implement functionality for managing tasks
@@ -53,11 +83,6 @@ impl Task {
             priority,
         }
     }
-
-    // // Set the task priority
-    // pub fn set_id(&mut self, id: Uuid) {
-    //     self.id = id;
-    // }
 
     // Set the task priority
     #[flutter_rust_bridge::frb(sync)]
@@ -107,15 +132,9 @@ impl Task {
         self.is_completed = is_completed;
     }
 
-    // Mark a task as incomplete
-    // #[flutter_rust_bridge::frb(sync)]
-    // pub fn mark_incomplete(&mut self) {
-    //     self.is_completed = false;
-    // }
-
     #[flutter_rust_bridge::frb(sync)]
     pub fn is_completed(&mut self) -> bool {
-        self.is_completed.clone();
+        self.is_completed.clone()
     }
 
     // Set the task priority
@@ -133,7 +152,7 @@ impl Task {
 // Additional functionality (optional)
 
 // Function to filter tasks by completion status
-#[flutter_rust_bridge::frb(sync)]
+#[flutter_rust_bridge::frb(ignore)]
 pub fn filter_tasks_by_completion(tasks: Vec<Task>, is_completed: bool) -> Vec<Task> {
     tasks
         .into_iter()
@@ -142,7 +161,7 @@ pub fn filter_tasks_by_completion(tasks: Vec<Task>, is_completed: bool) -> Vec<T
 }
 
 // Function to filter tasks by priority
-#[flutter_rust_bridge::frb(sync)]
+#[flutter_rust_bridge::frb(ignore)]
 pub fn filter_tasks_by_priority(tasks: Vec<Task>, priority: Priority) -> Vec<Task> {
     tasks
         .into_iter()

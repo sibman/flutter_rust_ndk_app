@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 ///
-//import '../../../models/task.dart';
-import 'package:flutter_rust_ndk_app/src/rust/api/simple.dart';
+import 'package:flutter_rust_ndk_app/utils/persistence.dart';
 import 'package:flutter_rust_ndk_app/src/rust/api/model.dart';
-import '../../../utils/colors.dart';
-import '../../../view/tasks/task_view.dart';
+import 'package:flutter_rust_ndk_app/utils/colors.dart';
+import 'package:flutter_rust_ndk_app/view/tasks/task_view.dart';
+import 'package:provider/provider.dart';
 
 class TaskWidget extends StatefulWidget {
   // ignore: use_super_parameters
@@ -40,134 +40,163 @@ class _TaskWidgetState extends State<TaskWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          CupertinoPageRoute(
-            builder: (ctx) => TaskView(
-              taskControllerForTitle: taskControllerForTitle,
-              taskControllerForSubtitle: taskControllerForSubtitle,
-              task: widget.task,
-            ),
-          ),
-        );
-      },
+    final taskPersistence =
+        Provider.of<TaskPersistenceModel>(context, listen: false);
 
-      /// Main Card
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 600),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-            color: widget.task.isCompleted()
-                ? const Color.fromARGB(154, 119, 144, 229)
-                : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(.1),
-                  offset: const Offset(0, 4),
-                  blurRadius: 10)
-            ]),
-        child: ListTile(
-
-            /// Check icon
-            leading: GestureDetector(
-              onTap: () {
-                widget.task
-                    .setCompleted(isCompleted: !widget.task.isCompleted());
-                updateTask(
-                  taskId: widget.task.getId(),
-                  title: widget.task.getTitle(),
-                  subtitle: widget.task.getSubtitle(),
-                  isCompleted: widget.task.isCompleted(),
-                  priority: widget.task.getPriority(),
-                );
-              },
-              child: AnimatedContainer(
+    return FocusableActionDetector(
+        child: TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                CupertinoPageRoute(
+                  builder: (ctx) => TaskView(
+                    taskControllerForTitle: taskControllerForTitle.text.isEmpty
+                        ? TextEditingController()
+                        : TextEditingController(
+                            text: taskControllerForTitle.text),
+                    taskControllerForSubtitle:
+                        taskControllerForSubtitle.text.isEmpty
+                            ? TextEditingController()
+                            : TextEditingController(
+                                text: taskControllerForSubtitle.text),
+                    task: widget.task,
+                  ),
+                ),
+              );
+            },
+            child: AnimatedContainer(
                 duration: const Duration(milliseconds: 600),
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                     color: widget.task.isCompleted()
-                        ? MyColors.primaryColor
+                        ? const Color.fromARGB(154, 119, 144, 229)
                         : Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.grey, width: .8)),
-                child: const Icon(
-                  Icons.check,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-
-            /// title of Task
-            title: Padding(
-              padding: const EdgeInsets.only(bottom: 5, top: 3),
-              child: Text(
-                taskControllerForTitle.text,
-                style: TextStyle(
-                    color: widget.task.isCompleted()
-                        ? MyColors.primaryColor
-                        : Colors.black,
-                    fontWeight: FontWeight.w500,
-                    decoration: widget.task.isCompleted()
-                        ? TextDecoration.lineThrough
-                        : null),
-              ),
-            ),
-
-            /// Description of task
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  taskControllerForSubtitle.text,
-                  style: TextStyle(
-                    color: widget.task.isCompleted()
-                        ? MyColors.primaryColor
-                        : const Color.fromARGB(255, 164, 164, 164),
-                    fontWeight: FontWeight.w300,
-                    decoration: widget.task.isCompleted()
-                        ? TextDecoration.lineThrough
-                        : null,
-                  ),
-                ),
-
-                /// Date & Time of Task
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(
-                      bottom: 10,
-                      top: 10,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          DateFormat('hh:mm a')
-                              .format(widget.task.getCreatedAt()),
-                          style: TextStyle(
-                              fontSize: 14,
-                              color: widget.task.isCompleted()
-                                  ? Colors.white
-                                  : Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(.1),
+                          offset: const Offset(0, 4),
+                          blurRadius: 10)
+                    ]),
+                child: Row(children: [
+                  /// Check icon
+                  FocusableActionDetector(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 600),
+                      decoration: BoxDecoration(
+                          color: widget.task.isCompleted()
+                              ? TodoManagerColorConstants.primaryColor
+                              : Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey, width: .8)),
+                      child: TextButton(
+                        onPressed: () {
+                          final isCompleted = widget.task.isCompleted();
+                          widget.task.setCompleted(isCompleted: !isCompleted);
+                          taskPersistence.updateTask(
+                            taskId: widget.task.getId(),
+                            title: widget.task.getTitle(),
+                            subtitle: widget.task.getSubtitle(),
+                            isCompleted: widget.task.isCompleted(),
+                            priority: widget.task.getPriority(),
+                          );
+                        },
+                        child: const Icon(
+                          Icons.check,
+                          color: Colors.white,
                         ),
-                        Text(
-                          DateFormat.yMMMEd()
-                              .format(widget.task.getCreatedAt()),
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: widget.task.isCompleted()
-                                  ? Colors.white
-                                  : Colors.grey),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            )),
-      ),
-    );
+
+                  /// Task details
+                  Expanded(
+                      child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                /// title of Task
+                                Text(
+                                  taskControllerForTitle.text,
+                                  style: TextStyle(
+                                      color: widget.task.isCompleted()
+                                          ? TodoManagerColorConstants
+                                              .primaryColor
+                                          : Colors.black,
+                                      fontWeight: FontWeight.w500,
+                                      decoration: widget.task.isCompleted()
+                                          ? TextDecoration.lineThrough
+                                          : null),
+                                ),
+
+                                /// Description of task
+                                Text(
+                                  taskControllerForSubtitle.text,
+                                  style: TextStyle(
+                                    color: widget.task.isCompleted()
+                                        ? TodoManagerColorConstants.primaryColor
+                                        : const Color.fromARGB(
+                                            255, 164, 164, 164),
+                                    fontWeight: FontWeight.w300,
+                                    decoration: widget.task.isCompleted()
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                  ),
+                                ),
+
+                                Row(
+                                  children: [
+                                    Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          widget.task.getPriority().toString(),
+                                          style: TextStyle(
+                                            color: widget.task.isCompleted()
+                                                ? TodoManagerColorConstants
+                                                    .primaryColor
+                                                : const Color.fromARGB(
+                                                    255, 164, 164, 164),
+                                            fontWeight: FontWeight.w300,
+                                            decoration:
+                                                widget.task.isCompleted()
+                                                    ? TextDecoration.lineThrough
+                                                    : null,
+                                          ),
+                                        )),
+
+                                    const SizedBox(width: 50, height: 10),
+
+                                    /// Date & Time of Task
+                                    Expanded(
+                                        child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 10,
+                                          top: 10,
+                                        ),
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              DateFormat.yMMMEd().format(
+                                                  widget.task.getCreatedAt()),
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color:
+                                                      widget.task.isCompleted()
+                                                          ? Colors.white
+                                                          : Colors.grey),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    )),
+                                  ],
+                                )
+                              ]))),
+                ]))));
   }
 }

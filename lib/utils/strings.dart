@@ -1,4 +1,4 @@
-class MyString {
+class TodoManagerStringConstants {
   static const String mainTitle = "My Tasks";
   static const String deletedTask = "This task was deleted";
   static const String doneAllTask = "You Have Done All Tasks!👌";
@@ -14,4 +14,5 @@ class MyString {
   static const String updateTaskString = "Update Task";
   static const String oopsMsg = "Oops!";
   static const String areYouSure = "Are You Sure?";
+  static const String taskStrings = "Tasks";
 }

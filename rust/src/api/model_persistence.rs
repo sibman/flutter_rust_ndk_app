@@ -1,6 +1,7 @@
 use crate::api::model::Priority;
 use crate::api::model::Task;
 use chrono::{DateTime, Local};
+//use flutter_rust_bridge::frb;
 use lazy_static::lazy_static;
 use rusqlite::{params, Connection};
 use std::sync::Mutex;
@@ -83,6 +84,7 @@ impl From<CustomError> for rusqlite::Error {
 // Database interaction functions
 // CRUD operations
 // Create a new task in the database
+#[flutter_rust_bridge::frb(ignore)]
 pub fn create_task_in_db(
     title: &str,
     subtitle: &str,
@@ -95,20 +97,26 @@ pub fn create_task_in_db(
             "Invalid connection".to_string(),
         )))?;
     let task = Task::new(title, subtitle, priority);
-    create_task(conn, &task)?;
+    create_task(conn, task)?;
     Ok(())
 }
 // Read all tasks from the database
-pub fn read_all_tasks_from_db() -> Result<Vec<Task>, rusqlite::Error> {
+#[flutter_rust_bridge::frb(ignore)]
+pub fn read_all_tasks_from_db(
+    created_at: DateTime<Local>,
+    is_completed_only: bool,
+    is_ignore_created_at: bool,
+) -> Result<Vec<Task>, rusqlite::Error> {
     let mut conn_lock = CONNECTION.conn.lock().unwrap();
     let conn = conn_lock
         .as_mut()
         .ok_or(rusqlite::Error::from(CustomError::InvalidConnection(
             "Invalid connection".to_string(),
         )))?;
-    read_tasks(conn)
+    read_tasks(conn, created_at, is_completed_only, is_ignore_created_at)
 }
 // Read task from the database
+#[flutter_rust_bridge::frb(ignore)]
 pub fn read_task_from_db(task_id: &Uuid) -> Result<Option<Task>, rusqlite::Error> {
     let mut conn_lock = CONNECTION.conn.lock().unwrap();
     let conn = conn_lock
@@ -120,6 +128,7 @@ pub fn read_task_from_db(task_id: &Uuid) -> Result<Option<Task>, rusqlite::Error
     read_task(conn, task_id)
 }
 // Update a task in the database
+#[flutter_rust_bridge::frb(ignore)]
 pub fn update_task_in_db(
     task_id: &Uuid,
     title: &str,
@@ -141,10 +150,11 @@ pub fn update_task_in_db(
         is_completed: is_completed,
         priority,
     };
-    update_task(conn, &task)?;
+    update_task(conn, task)?;
     Ok(())
 }
 // Delete a task from the database
+#[flutter_rust_bridge::frb(ignore)]
 pub fn delete_task_from_db(task_id: &Uuid) -> Result<(), rusqlite::Error> {
     let mut conn_lock = CONNECTION.conn.lock().unwrap();
     let conn = conn_lock
@@ -155,7 +165,19 @@ pub fn delete_task_from_db(task_id: &Uuid) -> Result<(), rusqlite::Error> {
     delete_task(conn, task_id)
 }
 
-fn create_task(conn: &Connection, task: &Task) -> Result<(), rusqlite::Error> {
+// Delete a task from the database
+#[flutter_rust_bridge::frb(ignore)]
+pub fn delete_tasks_from_db() -> Result<(), rusqlite::Error> {
+    let mut conn_lock = CONNECTION.conn.lock().unwrap();
+    let conn = conn_lock
+        .as_mut()
+        .ok_or(rusqlite::Error::from(CustomError::InvalidConnection(
+            "Invalid connection".to_string(),
+        )))?;
+    delete_tasks(conn)
+}
+
+fn create_task(conn: &Connection, task: Task) -> Result<(), rusqlite::Error> {
     conn.execute(
         "INSERT INTO tasks (
         id,
@@ -171,15 +193,66 @@ fn create_task(conn: &Connection, task: &Task) -> Result<(), rusqlite::Error> {
             task.subtitle,
             task.created_at.to_rfc3339(), // 1996-12-19T16:39:57-08:00 ISO 8601
             task.is_completed as i32,
-            format!("{:?}", task.priority)
+            task.priority.to_string()
         ],
     )?;
     Ok(())
 }
 
-fn read_tasks(conn: &Connection) -> Result<Vec<Task>, rusqlite::Error> {
-    let mut stmt =
-        conn.prepare("SELECT id, title, subtitle, created_at, is_completed, priority FROM tasks")?;
+fn read_tasks(
+    conn: &Connection,
+    created_at: DateTime<Local>,
+    is_completed_only: bool,
+    is_ignore_created_at: bool,
+) -> Result<Vec<Task>, rusqlite::Error> {
+    // Sample start and end dates (replace with your logic)
+    let start_date = created_at.clone(); // 1 days ago
+    let end_date = created_at + chrono::Duration::days(1);
+
+    // Flag indicating whether to ignore date filter
+    let ignore_created_dt = is_ignore_created_at;
+    // Flag indicating to filter only completed tasks
+    let is_completed_only = is_completed_only;
+    let start_date_str = start_date.format("%Y-%m-%d").to_string();
+    let end_date_str = end_date.format("%Y-%m-%d").to_string();
+
+    let mut stmt = match (ignore_created_dt, is_completed_only) {
+        (true, false) => conn.prepare(
+            "SELECT id, title, subtitle, created_at, is_completed, priority \
+            FROM tasks \
+            ORDER BY created_at",
+        )?,
+        (true, true) => conn.prepare(
+            "SELECT id, title, subtitle, created_at, is_completed, priority \
+            FROM tasks \
+            WHERE is_completed = 1 \
+            ORDER BY created_at",
+        )?,
+        (false, false) => {
+            let sql = format!(
+                "SELECT id, title, subtitle, created_at, is_completed, priority \
+                FROM tasks \
+                WHERE created_at BETWEEN strftime('%%Y-%%m-%%d', '{start_date_str}') AND strftime('%%Y-%%m-%%d', '{end_date_str}') \
+                ORDER BY created_at");
+            let sql = sql.replace("%%", "%");
+            conn.prepare(&sql)?
+        }
+        (false, true) => {
+            let sql = format!(
+                "SELECT id, title, subtitle, created_at, is_completed, priority \
+                FROM tasks \
+                WHERE \
+                (created_at BETWEEN strftime('%%Y-%%m-%%d', '{start_date_str}') AND strftime('%%Y-%%m-%%d', '{end_date_str}') \
+                AND is_completed = 1) \
+                ORDER BY created_at");
+            let sql = sql.replace("%%", "%");
+            conn.prepare(&sql)?
+        }
+    };
+
+    // let mut stmt = conn.prepare(
+    //     "SELECT id, title, subtitle, created_at, is_completed, priority FROM tasks",
+    // )?;
     let task_iter = stmt.query_map([], |row| {
         let row_id = row.get::<_, String>(0)?; // Extract the string
         let parsed_id: Uuid = match Uuid::parse_str(&row_id) {
@@ -209,7 +282,7 @@ fn read_tasks(conn: &Connection) -> Result<Vec<Task>, rusqlite::Error> {
         let priority_str: String = row.get(5)?;
         let priority = match priority_str.as_str() {
             "Low" => Priority::Low,
-            "Medium" => Priority::Medium,
+            "Normal" => Priority::Normal,
             "High" => Priority::High,
             _ => panic!("Invalid priority value in database"),
         };
@@ -266,7 +339,7 @@ fn read_task(conn: &Connection, task_id: &Uuid) -> Result<Option<Task>, rusqlite
         let priority_str: String = row.get(5)?;
         let priority = match priority_str.as_str() {
             "Low" => Priority::Low,
-            "Medium" => Priority::Medium,
+            "Normal" => Priority::Normal,
             "High" => Priority::High,
             _ => panic!("Invalid priority value in database"),
         };
@@ -282,7 +355,7 @@ fn read_task(conn: &Connection, task_id: &Uuid) -> Result<Option<Task>, rusqlite
     Ok(task)
 }
 
-fn update_task(conn: &Connection, task: &Task) -> Result<(), rusqlite::Error> {
+fn update_task(conn: &Connection, task: Task) -> Result<(), rusqlite::Error> {
     conn.execute(
         "UPDATE tasks SET
           title = ?,
@@ -296,7 +369,7 @@ fn update_task(conn: &Connection, task: &Task) -> Result<(), rusqlite::Error> {
             task.subtitle,
             task.created_at.to_rfc3339(),
             task.is_completed as i32,
-            format!("{:?}", task.priority),
+            task.priority.to_string(),
             task.id.to_string()
         ],
     )?;
@@ -305,5 +378,10 @@ fn update_task(conn: &Connection, task: &Task) -> Result<(), rusqlite::Error> {
 
 fn delete_task(conn: &Connection, task_id: &Uuid) -> Result<(), rusqlite::Error> {
     conn.execute("DELETE FROM tasks WHERE id = ?", [task_id.to_string()])?;
+    Ok(())
+}
+
+fn delete_tasks(conn: &Connection) -> Result<(), rusqlite::Error> {
+    conn.execute("DELETE FROM tasks", [])?;
     Ok(())
 }
