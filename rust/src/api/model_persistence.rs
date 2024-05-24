@@ -1,16 +1,18 @@
 use crate::api::model::Priority;
 use crate::api::model::Task;
 use chrono::{DateTime, Local};
-//use flutter_rust_bridge::frb;
 use lazy_static::lazy_static;
 use rusqlite::{params, Connection};
+use std::io::{Error, ErrorKind};
 use std::sync::Mutex;
 use uuid::Uuid;
 
 lazy_static! {
     static ref CONNECTION: CachedConnection = {
-        let conn = CachedConnection::new("test.db").expect("Failed to create connection");
-        conn
+        match get_sqlite_path() {
+            Ok(path) => CachedConnection::new(&path).expect("Failed to create connection"),
+            Err(err) => panic!("Failed to create connection: {}", err),
+        }
     };
 }
 
@@ -250,9 +252,6 @@ fn read_tasks(
         }
     };
 
-    // let mut stmt = conn.prepare(
-    //     "SELECT id, title, subtitle, created_at, is_completed, priority FROM tasks",
-    // )?;
     let task_iter = stmt.query_map([], |row| {
         let row_id = row.get::<_, String>(0)?; // Extract the string
         let parsed_id: Uuid = match Uuid::parse_str(&row_id) {
@@ -384,4 +383,38 @@ fn delete_task(conn: &Connection, task_id: &Uuid) -> Result<(), rusqlite::Error>
 fn delete_tasks(conn: &Connection) -> Result<(), rusqlite::Error> {
     conn.execute("DELETE FROM tasks", [])?;
     Ok(())
+}
+
+fn get_sqlite_path() -> Result<String, Error> {
+    let data_dir = dirs::data_dir().ok_or(Error::new(
+        ErrorKind::NotFound,
+        "Failed to locate data directory",
+    ))?;
+
+    let path = match cfg!(target_os = "windows") {
+        true => data_dir
+            .join("rust_lib_flutter_rust_ndk_app")
+            .join("database.sqlite"),
+        false => {
+            #[cfg(target_os = "linux")]
+            let path = data_dir
+                .join("rust_lib_flutter_rust_ndk_app")
+                .join("database.sqlite");
+            #[cfg(target_os = "macos")]
+            let path = data_dir
+                .join("rust_lib_flutter_rust_ndk_app")
+                .join("database.sqlite");
+            #[cfg(target_os = "android")]
+            let path = data_dir
+                .join("databases")
+                .join("rust_lib_flutter_rust_ndk_app.sqlite");
+            path
+        }
+    };
+
+    if !path.exists() {
+        std::fs::create_dir_all(path.parent().unwrap())?;
+    }
+
+    Ok(path.to_string_lossy().to_string())
 }
