@@ -37,6 +37,7 @@ class Priority extends RustOpaque {
   static Priority normalPriority({dynamic hint}) =>
       RustLib.instance.api.crateApiModelPriorityNormalPriority(hint: hint);
 
+  @override
   String toString({dynamic hint}) => RustLib.instance.api
       .crateApiModelPriorityToString(that: this, hint: hint);
 }

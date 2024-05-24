@@ -62,7 +62,7 @@ dynamic deleteAllTask(BuildContext context) {
       Navigator.pop(context);
     },
     onTapConfirm: () {
-      //TODO verify implementation, do we need to delete historical data?
+      //TODO #1 verify implementation, do we need to delete historical data?
       taskPersistence.deleteTasks();
       Navigator.pop(context);
     },

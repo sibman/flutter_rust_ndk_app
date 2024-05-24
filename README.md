@@ -1,8 +1,6 @@
 # flutter_rust_ndk_app
+
 example of flutter and rust integrated application
-
-# flutter_rust_ndk_app
-
 A new Flutter project.
 
 ## Getting Started
