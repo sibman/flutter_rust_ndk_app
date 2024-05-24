@@ -1,0 +1,1 @@
+ /data/dev/repo/sibbull/rust/flutter_rust_ndk_app/.dart_tool/flutter_build/94218e2d0156029fb33758a507e99cf8/native_assets.yaml: 
