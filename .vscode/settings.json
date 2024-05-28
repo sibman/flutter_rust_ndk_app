@@ -1,4 +1,4 @@
 {
-    "circleci.persistedProjectSelection": [],
-    "cmake.sourceDirectory": "/data/dev/repo/sibbull/rust/flutter_rust_ndk_app/linux"
+  "circleci.persistedProjectSelection": [],
+  "cmake.sourceDirectory": "/data/dev/repo/sibbull/rust/flutter_rust_ndk_app/linux"
 }
