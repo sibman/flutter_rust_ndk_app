@@ -236,10 +236,10 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2024-05-20T21:33:03.428055Z",
+  "generated": "2024-06-05T05:27:50.729240Z",
   "generator": "pub",
-  "generatorVersion": "3.4.0",
+  "generatorVersion": "3.4.1",
   "flutterRoot": "file:///data/dev/repo/github/flutter",
-  "flutterVersion": "3.22.0",
+  "flutterVersion": "3.22.1",
   "pubCache": "file:///home/sibman/.pub-cache"
 }
