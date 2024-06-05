@@ -91,7 +91,7 @@ pub fn create_task_in_db(
     title: &str,
     subtitle: &str,
     priority: Priority,
-) -> Result<(), rusqlite::Error> {
+) -> Result<Task, rusqlite::Error> {
     let mut conn_lock = CONNECTION.conn.lock().unwrap();
     let conn = conn_lock
         .as_mut()
@@ -99,8 +99,8 @@ pub fn create_task_in_db(
             "Invalid connection".to_string(),
         )))?;
     let task = Task::new(title, subtitle, priority);
-    create_task(conn, task)?;
-    Ok(())
+    create_task(conn, task.clone())?;
+    Ok(task)
 }
 // Read all tasks from the database
 #[flutter_rust_bridge::frb(ignore)]

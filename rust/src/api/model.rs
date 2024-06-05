@@ -56,7 +56,7 @@ impl fmt::Display for Priority {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[frb(opaque)]
 //#[frb(non_opaque)]
 pub struct Task {
